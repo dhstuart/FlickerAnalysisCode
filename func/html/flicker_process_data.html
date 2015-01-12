@@ -1,0 +1,455 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>flicker_process_data</title><meta name="generator" content="MATLAB 7.14"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2014-05-30"><meta name="DC.source" content="flicker_process_data.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, tt, code { font-size:12px; }
+pre { margin:0px 0px 20px; }
+pre.error { color:red; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#3">--------------- find file names and paths ----------------</a></li><li><a href="#4">-------------------- open and process files ------------------------</a></li><li><a href="#6">---------------------------------------- PLOTS -----------------------------------------------</a></li><li><a href="#8">-----------creat pivot table----------</a></li></ul></div><pre class="codeinput"><span class="comment">%-----------------------VERSION NOTES---------------------------------</span>
+<span class="comment">% v20 - v19 didn't correctly normalize to full output. v20 fixes this</span>
+<span class="comment">%       *removed write to excel functionality. Wasn't using this anymore</span>
+
+<span class="comment">% need versatility to consider lamps that are not dimmed</span>
+<span class="comment">% In this case, need to ouput single plot at 200Hz and in PNG format</span>
+
+<span class="keyword">function</span> flicker_process_data(dim)
+</pre><pre class="codeinput">clc
+<span class="comment">% clear all</span>
+close <span class="string">all</span>
+
+current_path = pwd;
+addpath([pwd <span class="string">'/func'</span>]);
+addpath([pwd <span class="string">'/lib'</span>]);
+addpath([pwd <span class="string">'/lib/export_fig'</span>]);
+
+<span class="keyword">global</span> y y2 filtered_data2 y3
+
+warning(<span class="string">'off'</span>,<span class="string">'MATLAB:hg:ColorSpec_None'</span>)       <span class="comment">%turn off warning for transparency in charts</span>
+
+record_lengths = [1];
+frequency_choice = [];
+cut_off = [60 120 200 240 300 500 1000 3000 10000  125000];
+<span class="comment">%-----------------------</span>
+plots_on = 1;
+create_pivot_table = 1;
+printPlot = 1;
+<span class="comment">%------------------------------</span>
+
+flicker_metric_array = [];
+cut_off_analysis_percent_flicker = [];
+cut_off_analysis_flicker_index = [];
+cut_off_analysis_fund_freq = [];
+amp_mod_mat = [];
+flicker_index_mat = [];
+fund_freq_mat = [];
+SNR_limit = 30;
+</pre><h2>--------------- find file names and paths ----------------<a name="3"></a></h2><p>data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\JST LuxPAR Flicker'; data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\test data'; data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\cree2x2';</p><pre class="codeinput">data_path = uigetdir(<span class="string">' '</span>,<span class="string">'Select top directory of files to procecss'</span>);
+
+<span class="keyword">if</span> dim == 0
+    list=dir(data_path);
+    fls={list(~[list.isdir]).name};
+    file_indices = ~cellfun(@isempty,regexpi(fls, <span class="string">'\w+(?=_light.csv)'</span>));    <span class="comment">%find which files are the light files</span>
+    file_cell = fls(file_indices);
+    fls = fls(file_indices);
+<span class="keyword">else</span>
+    [subs,fls] = subdir(data_path);
+<span class="keyword">end</span>
+
+dum2 = 0;
+</pre><pre class="codeoutput">Error using flicker_process_data (line 48)
+Not enough input arguments.
+</pre><h2>-------------------- open and process files ------------------------<a name="4"></a></h2><pre class="codeinput"><span class="keyword">for</span> i= 1:length(fls)
+    norm_level = 0;
+
+    <span class="keyword">if</span> dim == 0
+        itterateOver = 1;
+    <span class="keyword">else</span>
+        file_indices = ~cellfun(@isempty,regexpi(fls{i}, <span class="string">'\w+(?=_light.csv)'</span>));    <span class="comment">%find which files are the light files</span>
+        file_cell = fls{i}(file_indices);                       <span class="comment">%only consider "light" files</span>
+        itterateOver = size(file_cell,2):-1:1;     <span class="comment">%start at 100% dim for normalization and step down</span>
+    <span class="keyword">end</span>
+
+    disp(<span class="string">'----------------------------------------------------'</span>)
+    <span class="keyword">for</span> j = itterateOver
+</pre><pre class="codeinput">        <span class="keyword">if</span> dim == 0
+            pathOpen = [data_path <span class="string">'\'</span> file_cell{i}];
+        <span class="keyword">else</span>
+            pathOpen = [subs{i} <span class="string">'\'</span> file_cell{j}];
+        <span class="keyword">end</span>
+
+        fid1 = fopen(pathOpen);
+        temp = textscan(fid1,<span class="string">'%s'</span>,<span class="string">'delimiter'</span>,<span class="string">'\n'</span>);
+        fclose(fid1);
+        temp2 = regexpi(temp{1,1},<span class="string">','</span>,<span class="string">'split'</span>);
+        temp3=vertcat(temp2{3:end});
+        header_titles = temp2{1};
+        header_data = temp2{2};
+        data = cellfun(@str2num,temp3);
+
+        <span class="comment">%------- collect data from header -------------</span>
+        dt = str2num(header_data{strcmp(header_titles,<span class="string">'dt'</span>)});
+        model = header_data{strcmp(header_titles,<span class="string">'model'</span>)};
+        dim_level = str2num(header_data{strcmp(header_titles,<span class="string">'dim level'</span>)});
+        dimmer_type = header_data{strcmp(header_titles,<span class="string">'dimmer type'</span>)};
+
+        disp([<span class="string">'MODEL: '</span> model <span class="string">'     DIMMER TYPE: '</span> dimmer_type <span class="string">'     DIM LEVEL: '</span> num2str(dim_level)])
+        subplot_index = 1;
+
+        t = 0:dt:dt*(length(data)-1);
+        norm_index = length(cut_off)-1;<span class="comment">%-8;</span>
+        norm_loop = 1;
+
+        <span class="keyword">for</span> freq =[norm_index 1:length(cut_off)]
+
+            [filtered_data{freq}, fund_freq(freq), amp_mod(freq) SNR(freq)] = fft_cutoff_analysis(data, dt, cut_off(freq),0);   <span class="comment">%last argument is method, 0 is fft/ifft</span>
+
+            filtered_data_intwav{freq} = filtered_data{freq};
+            t_filtered_data_intwav{freq} = t;
+
+            <span class="keyword">if</span> norm_level == 0 &amp;&amp; freq == norm_index
+                norm_level = max(filtered_data_intwav{freq});
+                norm_loop = 0;
+            <span class="keyword">elseif</span> norm_loop == 1
+                norm_loop = 0;
+            <span class="keyword">elseif</span> norm_loop == 0;
+
+                [average_level_fft(freq)  flicker_index_fft(freq) percent_flicker_fft(freq)] = flicker_metrics(t_filtered_data_intwav{freq}, filtered_data_intwav{freq}/norm_level);
+                <span class="comment">%                     local_percent_flicker{model_index,dim_level_index,freq,:} = percent_flicker_variation(t,filtered_data{freq});</span>
+                out = percent_flicker_variation(t,filtered_data{freq},fund_freq(freq));
+
+                dum2 = dum2+1;
+                a(dum2).model = model;
+                a(dum2).dim_level = dim_level;
+                a(dum2).duration = t(end)-t(1)+dt;
+                a(dum2).dt = dt;
+                a(dum2).dimming_hardware = dimmer_type;
+                a(dum2).cutoff = cut_off(freq);
+                a(dum2).fundamental_frequency = fund_freq(freq);
+<span class="comment">%                 a(dum2).percent_flicker_max = out(1);</span>
+                a(dum2).percent_flicker_avg = out(2);
+                a(dum2).percent_flicker = percent_flicker_fft(freq);
+                a(dum2).flicker_index = flicker_index_fft(freq);
+                a(dum2).max = out(3)/norm_level;
+            <span class="keyword">end</span>
+        <span class="keyword">end</span>
+</pre><h2>---------------------------------------- PLOTS -----------------------------------------------<a name="6"></a></h2><pre class="codeinput">        <span class="keyword">if</span> plots_on ==1
+            <span class="keyword">if</span> dim ==0
+                figure
+                freqIndex = 3; <span class="comment">%200 hz</span>
+            <span class="keyword">else</span>
+                figure(<span class="string">'Position'</span>, [1 1 1920*.9 1080*.9])       <span class="comment">%set window size to little smaller than HD</span>
+                freqIndex = 1:length(cut_off)-2;
+            <span class="keyword">end</span>
+            <span class="keyword">for</span> freq = freqIndex
+                <span class="keyword">if</span> dim == 1
+                    subplot(2,4,freq)
+                <span class="keyword">end</span>
+                hold <span class="string">all</span>
+                plot(t_filtered_data_intwav{freq}-t_filtered_data_intwav{freq}(1),filtered_data_intwav{freq}/norm_level,<span class="string">'Color'</span>,[0 0 1])
+                line([0 t_filtered_data_intwav{freq}(end)-t_filtered_data_intwav{freq}(1)],[average_level_fft(freq) average_level_fft(freq)],<span class="string">'LineStyle'</span>,<span class="string">'--'</span>, <span class="string">'Color'</span>, <span class="string">'r'</span>)
+                xlabel(<span class="string">'time (s)'</span>)
+                ylabel(<span class="string">'normalized potential (v/v)'</span>)
+                title(sprintf(<span class="string">'%s, Dimmer: %s at %d%%, Filter at %d Hz'</span>, model, dimmer_type, dim_level, cut_off(freq)), <span class="string">'FontSize'</span>, 10)
+
+                filt_fund_freq = sprintf(<span class="string">'%0.0f'</span>,fund_freq(freq));
+                unfilt_fund_freq = sprintf(<span class="string">'%0.0f'</span>,fund_freq(10));
+                <span class="keyword">if</span> SNR(freq) &lt;SNR_limit
+                    filt_fund_freq = [filt_fund_freq <span class="string">'*'</span>];
+                <span class="keyword">end</span>
+                <span class="keyword">if</span> SNR(10) &lt; SNR_limit
+                    unfilt_fund_freq = [unfilt_fund_freq <span class="string">'*'</span>];
+                <span class="keyword">end</span>
+
+                hold <span class="string">on</span>
+                <span class="keyword">if</span> dim == 0
+                    axis <span class="string">square</span>
+                    fill([0 0 0.026 0.026],[1.05 1.35 1.35 1.05], <span class="string">'w'</span>)<span class="comment">% %use this for original flicker data</span>
+                    text(0.0003,1.20,{sprintf(<span class="string">'percent flicker %0.2f'</span>,percent_flicker_fft(freq)) sprintf(<span class="string">'flicker index %0.2f'</span>,flicker_index_fft(freq)) [<span class="string">'filt. fund. freq. '</span> filt_fund_freq] [<span class="string">'unfilt. fund. freq. '</span> unfilt_fund_freq]}, <span class="string">'FontSize'</span>, 12) <span class="comment">% original flicker data</span>
+                    axis([0, .04, 0, 1.35]);
+                <span class="keyword">else</span>
+                    fill([0 0 0.026 0.026],[.92 1.2 1.2 .92], <span class="string">'w'</span>)<span class="comment">% %use this for original flicker data</span>
+                    text(0.0003,1.06,{sprintf(<span class="string">'percent flicker %0.2f'</span>,percent_flicker_fft(freq)) sprintf(<span class="string">'flicker index %0.2f'</span>,flicker_index_fft(freq)) [<span class="string">'filt. fund. freq. '</span> filt_fund_freq] [<span class="string">'unfilt. fund. freq. '</span> unfilt_fund_freq]}, <span class="string">'FontSize'</span>, 12) <span class="comment">% original flicker data</span>
+                    axis([0, .04, 0, 1.2]);
+                <span class="keyword">end</span>
+
+                grid <span class="string">on</span>
+                hold <span class="string">off</span>
+            <span class="keyword">end</span>
+            <span class="keyword">if</span> printPlot == 1
+                cd(data_path)
+                <span class="keyword">if</span> dim == 0
+                    opts = struct(<span class="string">'height'</span>, 9/2.54, <span class="string">'width'</span>,  9/2.54);
+                    set(gcf,<span class="string">'Color'</span>,<span class="string">'none'</span>);
+                    export_fig(gcf,sprintf(<span class="string">'%s_%s_%03d.png'</span>,model, dimmer_type, dim_level),opts);
+
+                <span class="keyword">else</span>
+                    export_fig(gcf,sprintf(<span class="string">'%s_%s_%03d.png'</span>,model, dimmer_type, dim_level));
+                <span class="keyword">end</span>
+                   close(gcf)
+            <span class="keyword">end</span>
+        <span class="keyword">end</span>
+</pre><pre class="codeinput">    <span class="keyword">end</span>
+<span class="keyword">end</span>
+</pre><h2>-----------creat pivot table----------<a name="8"></a></h2><pre class="codeinput"><span class="keyword">if</span> create_pivot_table == 1
+    cd(data_path)
+    header = fieldnames(a(1))';
+    outputForPivotTable = [header ;struct2cell(a')'];
+    cell2csv(sprintf(<span class="string">'%s_%s_%03d_for_pivot.csv'</span>,model, dimmer_type, dim_level),outputForPivotTable)
+<span class="keyword">end</span>
+</pre><p class="footer"><br>
+      Published with MATLAB&reg; 7.14<br></p></div><!--
+##### SOURCE BEGIN #####
+%REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-VERSION NOTESREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-
+% v20 - v19 didn't correctly normalize to full output. v20 fixes this
+%       *removed write to excel functionality. Wasn't using this anymore
+
+% need versatility to consider lamps that are not dimmed
+% In this case, need to ouput single plot at 200Hz and in PNG format
+
+function flicker_process_data(dim)
+
+clc
+% clear all
+close all
+
+current_path = pwd;
+addpath([pwd '/func']);
+addpath([pwd '/lib']);
+addpath([pwd '/lib/export_fig']);
+
+global y y2 filtered_data2 y3
+
+warning('off','MATLAB:hg:ColorSpec_None')       %turn off warning for transparency in charts
+
+record_lengths = [1];
+frequency_choice = [];
+cut_off = [60 120 200 240 300 500 1000 3000 10000  125000];
+%REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-
+plots_on = 1;
+create_pivot_table = 1;
+printPlot = 1;
+%REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH
+
+flicker_metric_array = [];
+cut_off_analysis_percent_flicker = [];
+cut_off_analysis_flicker_index = [];
+cut_off_analysis_fund_freq = [];
+amp_mod_mat = [];
+flicker_index_mat = [];
+fund_freq_mat = [];
+SNR_limit = 30;
+
+
+%% REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH- find file names and paths REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH
+% data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\JST LuxPAR Flicker';
+% data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\test data';
+% data_path = 'C:\Users\dhstuart\Documents\Energy Star Flicker Data\cree2x2';
+data_path = uigetdir(' ','Select top directory of files to procecss');
+
+if dim == 0
+    list=dir(data_path);
+    fls={list(~[list.isdir]).name};
+    file_indices = ~cellfun(@isempty,regexpi(fls, '\w+(?=_light.csv)'));    %find which files are the light files
+    file_cell = fls(file_indices);
+    fls = fls(file_indices);
+else
+    [subs,fls] = subdir(data_path);
+end
+
+dum2 = 0;
+%% REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH open and process files REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH
+
+for i= 1:length(fls)
+    norm_level = 0;
+    
+    if dim == 0
+        itterateOver = 1;
+    else
+        file_indices = ~cellfun(@isempty,regexpi(fls{i}, '\w+(?=_light.csv)'));    %find which files are the light files
+        file_cell = fls{i}(file_indices);                       %only consider "light" files
+        itterateOver = size(file_cell,2):-1:1;     %start at 100% dim for normalization and step down
+    end
+    
+    disp('REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH')
+    for j = itterateOver
+        if dim == 0
+            pathOpen = [data_path '\' file_cell{i}];
+        else
+            pathOpen = [subs{i} '\' file_cell{j}];
+        end
+        
+        fid1 = fopen(pathOpen);
+        temp = textscan(fid1,'%s','delimiter','\n');
+        fclose(fid1);
+        temp2 = regexpi(temp{1,1},',','split');
+        temp3=vertcat(temp2{3:end});
+        header_titles = temp2{1};
+        header_data = temp2{2};
+        data = cellfun(@str2num,temp3);
+        
+        %REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH- collect data from header REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-
+        dt = str2num(header_data{strcmp(header_titles,'dt')});
+        model = header_data{strcmp(header_titles,'model')};
+        dim_level = str2num(header_data{strcmp(header_titles,'dim level')});
+        dimmer_type = header_data{strcmp(header_titles,'dimmer type')};
+        
+        disp(['MODEL: ' model '     DIMMER TYPE: ' dimmer_type '     DIM LEVEL: ' num2str(dim_level)])
+        subplot_index = 1;
+        
+        t = 0:dt:dt*(length(data)-1);
+        norm_index = length(cut_off)-1;%-8;
+        norm_loop = 1;
+        
+        for freq =[norm_index 1:length(cut_off)]
+            
+            [filtered_data{freq}, fund_freq(freq), amp_mod(freq) SNR(freq)] = fft_cutoff_analysis(data, dt, cut_off(freq),0);   %last argument is method, 0 is fft/ifft
+            
+            filtered_data_intwav{freq} = filtered_data{freq};
+            t_filtered_data_intwav{freq} = t;
+            
+            if norm_level == 0 && freq == norm_index
+                norm_level = max(filtered_data_intwav{freq});
+                norm_loop = 0;
+            elseif norm_loop == 1
+                norm_loop = 0;
+            elseif norm_loop == 0;
+                
+                [average_level_fft(freq)  flicker_index_fft(freq) percent_flicker_fft(freq)] = flicker_metrics(t_filtered_data_intwav{freq}, filtered_data_intwav{freq}/norm_level);
+                %                     local_percent_flicker{model_index,dim_level_index,freq,:} = percent_flicker_variation(t,filtered_data{freq});
+                out = percent_flicker_variation(t,filtered_data{freq},fund_freq(freq));
+                
+                dum2 = dum2+1;
+                a(dum2).model = model;
+                a(dum2).dim_level = dim_level;
+                a(dum2).duration = t(end)-t(1)+dt;
+                a(dum2).dt = dt;
+                a(dum2).dimming_hardware = dimmer_type;
+                a(dum2).cutoff = cut_off(freq);
+                a(dum2).fundamental_frequency = fund_freq(freq);
+%                 a(dum2).percent_flicker_max = out(1);
+                a(dum2).percent_flicker_avg = out(2);
+                a(dum2).percent_flicker = percent_flicker_fft(freq);
+                a(dum2).flicker_index = flicker_index_fft(freq);
+                a(dum2).max = out(3)/norm_level;
+            end
+        end
+        
+        %% REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH PLOTS REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-
+        if plots_on ==1
+            if dim ==0
+                figure
+                freqIndex = 3; %200 hz
+            else
+                figure('Position', [1 1 1920*.9 1080*.9])       %set window size to little smaller than HD
+                freqIndex = 1:length(cut_off)-2;
+            end
+            for freq = freqIndex
+                if dim == 1
+                    subplot(2,4,freq)
+                end
+                hold all
+                plot(t_filtered_data_intwav{freq}-t_filtered_data_intwav{freq}(1),filtered_data_intwav{freq}/norm_level,'Color',[0 0 1])
+                line([0 t_filtered_data_intwav{freq}(end)-t_filtered_data_intwav{freq}(1)],[average_level_fft(freq) average_level_fft(freq)],'LineStyle','REPLACE_WITH_DASH_DASH', 'Color', 'r')
+                xlabel('time (s)')
+                ylabel('normalized potential (v/v)')
+                title(sprintf('%s, Dimmer: %s at %d%%, Filter at %d Hz', model, dimmer_type, dim_level, cut_off(freq)), 'FontSize', 10)
+                
+                filt_fund_freq = sprintf('%0.0f',fund_freq(freq));
+                unfilt_fund_freq = sprintf('%0.0f',fund_freq(10));
+                if SNR(freq) <SNR_limit
+                    filt_fund_freq = [filt_fund_freq '*'];
+                end
+                if SNR(10) < SNR_limit
+                    unfilt_fund_freq = [unfilt_fund_freq '*'];
+                end
+                
+                hold on
+                if dim == 0
+                    axis square
+                    fill([0 0 0.026 0.026],[1.05 1.35 1.35 1.05], 'w')% %use this for original flicker data
+                    text(0.0003,1.20,{sprintf('percent flicker %0.2f',percent_flicker_fft(freq)) sprintf('flicker index %0.2f',flicker_index_fft(freq)) ['filt. fund. freq. ' filt_fund_freq] ['unfilt. fund. freq. ' unfilt_fund_freq]}, 'FontSize', 12) % original flicker data
+                    axis([0, .04, 0, 1.35]);
+                else
+                    fill([0 0 0.026 0.026],[.92 1.2 1.2 .92], 'w')% %use this for original flicker data
+                    text(0.0003,1.06,{sprintf('percent flicker %0.2f',percent_flicker_fft(freq)) sprintf('flicker index %0.2f',flicker_index_fft(freq)) ['filt. fund. freq. ' filt_fund_freq] ['unfilt. fund. freq. ' unfilt_fund_freq]}, 'FontSize', 12) % original flicker data
+                    axis([0, .04, 0, 1.2]);
+                end
+                
+                grid on
+                hold off
+            end
+            if printPlot == 1
+                cd(data_path)
+                if dim == 0
+                    opts = struct('height', 9/2.54, 'width',  9/2.54);
+                    set(gcf,'Color','none');
+                    export_fig(gcf,sprintf('%s_%s_%03d.png',model, dimmer_type, dim_level),opts);
+                    
+                else
+                    export_fig(gcf,sprintf('%s_%s_%03d.png',model, dimmer_type, dim_level));
+                end
+                   close(gcf)
+            end
+        end
+    end
+end
+%% REPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH-creat pivot tableREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASHREPLACE_WITH_DASH_DASH
+if create_pivot_table == 1
+    cd(data_path)
+    header = fieldnames(a(1))';
+    outputForPivotTable = [header ;struct2cell(a')'];
+    cell2csv(sprintf('%s_%s_%03d_for_pivot.csv',model, dimmer_type, dim_level),outputForPivotTable)
+end
+
+##### SOURCE END #####
+--></body></html>

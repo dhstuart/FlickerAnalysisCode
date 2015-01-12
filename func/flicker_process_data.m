@@ -168,11 +168,11 @@ for i= 1:length(fls)
                     axis square
                     fill([0 0 0.026 0.026],[1.05 1.35 1.35 1.05], 'w')% %use this for original flicker data
                     text(0.0003,1.20,{sprintf('percent flicker %0.2f',percent_flicker_fft(freq)) sprintf('flicker index %0.2f',flicker_index_fft(freq)) ['filt. fund. freq. ' filt_fund_freq] ['unfilt. fund. freq. ' unfilt_fund_freq]}, 'FontSize', 12) % original flicker data
-%                     axis([0, .04, 0, 1.35]);
+                    axis([0, .04, 0, 1.35]);
                 else
                     fill([0 0 0.026 0.026],[.92 1.2 1.2 .92], 'w')% %use this for original flicker data
                     text(0.0003,1.06,{sprintf('percent flicker %0.2f',percent_flicker_fft(freq)) sprintf('flicker index %0.2f',flicker_index_fft(freq)) ['filt. fund. freq. ' filt_fund_freq] ['unfilt. fund. freq. ' unfilt_fund_freq]}, 'FontSize', 12) % original flicker data
-%                     axis([0, .04, 0, 1.2]);
+                    axis([0, .04, 0, 1.2]);
                 end
                 
                 grid on
